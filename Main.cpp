@@ -1,64 +1,108 @@
-// Sistema de Arquivos como Árvore
+// Sistema de Arquivos como Árvore em C++
 // Patric Federissi Vanin 202791, Robsin Donoin 202658
 
 #include <iostream>
 #include <vector>
 #include <string>
-#include <dirent.h>
-#include <sys/stat.h>
-#include <memory>
+#include <filesystem>
+#include <fstream>
 #include <algorithm>
+#include <map>
+#include <unistd.h> // Para getcwd
+
+namespace fs = std::filesystem;
 
 using namespace std;
 
-// Tipo para distinguir arquivos de diretórios
-enum Tipo { ARQUIVO, PASTA };
-
-// Estrutura de um nó da árvore
+// Estrutura que representa cada nó da árvore (arquivo ou diretório)
 struct Node {
-    string nome;
-    string caminhoCompleto;
-    Tipo tipo;
-    long long tamanho;
-    vector<shared_ptr<Node>> filhos;
+    string name;               // Nome do arquivo ou diretório
+    string path;               // Caminho completo
+    bool is_dir;              // Verdadeiro se for diretório
+    uintmax_t size;           // Tamanho do arquivo ou acumulado dos filhos
+    vector<Node*> children;   // Filhos do nó (apenas se for diretório)
 };
 
-// Função auxiliar para verificar se é um arquivo ou diretório regular
-bool ehArquivoOuPasta(const struct stat& st) {
-    return S_ISREG(st.st_mode) || S_ISDIR(st.st_mode);
+// Função para calcular o tamanho total de uma pasta de forma recursiva
+uintmax_t calcular_tamanho(Node* node) {
+    if (!node->is_dir) return node->size;
+    uintmax_t total = 0;
+    for (auto child : node->children) {
+        total += calcular_tamanho(child);
+    }
+    node->size = total;
+    return total;
 }
 
-// Função recursiva para construir a árvore
-shared_ptr<Node> carregarArvore(const string& caminho) {
-    struct stat info;
-    if (stat(caminho.c_str(), &info) != 0 || !ehArquivoOuPasta(info))
-        return nullptr;
+// Função para carregar a estrutura do diretório de forma recursiva
+Node* carregar_estrutura(const fs::path& path) {
+    if (!fs::exists(path)) return nullptr;
 
-    shared_ptr<Node> node = make_shared<Node>();
-    node->nome = caminho.substr(caminho.find_last_of("/") + 1);
-    node->caminhoCompleto = caminho;
-    node->tamanho = S_ISREG(info.st_mode) ? info.st_size : 0;
-    node->tipo = S_ISDIR(info.st_mode) ? PASTA : ARQUIVO;
+    Node* node = new Node;
+    node->name = path.filename().string();
+    node->path = path.string();
+    node->is_dir = fs::is_directory(path);
+    node->size = 0;
 
-    if (node->tipo == PASTA) {
-        DIR* dir = opendir(caminho.c_str());
-        if (!dir) return node;
-
-        struct dirent* entrada;
-        while ((entrada = readdir(dir)) != nullptr) {
-            string nomeEntrada = entrada->d_name;
-            if (nomeEntrada == "." || nomeEntrada == "..") continue;
-
-            string caminhoFilho = caminho + "/" + nomeEntrada;
-            shared_ptr<Node> filho = carregarArvore(caminhoFilho);
-            if (filho) {
-                node->tamanho += filho->tamanho;
-                node->filhos.push_back(filho);
+    if (node->is_dir) {
+        for (const auto& entry : fs::directory_iterator(path)) {
+            // Considerar apenas arquivos regulares e pastas
+            if (fs::is_regular_file(entry) || fs::is_directory(entry)) {
+                Node* child = carregar_estrutura(entry);
+                if (child) node->children.push_back(child);
             }
         }
-        closedir(dir);
+        calcular_tamanho(node);
+    } else {
+        node->size = fs::file_size(path);
     }
 
     return node;
 }
 
+// Impressão recursiva da árvore com indentação 
+void exibir_arvore(Node* node, int nivel = 0) {
+    if (!node) return;
+
+    // Indentação
+    for (int i = 0; i < nivel; ++i) cout << "│   ";
+
+    if (node->is_dir) {
+        // Para pastas exibir: Nome, Quantidade de filhos, Tamanho total acumulado
+        cout << "├── " << node->name << " (" << node->children.size() << " filhos, " << node->size << " bytes)\n";
+        for (auto child : node->children) exibir_arvore(child, nivel + 1);
+    } else {
+        // Para arquivos exibir: Nome e Tamanho em bytes
+        cout << "├── " << node->name << " (" << node->size << " bytes)\n";
+    }
+}
+
+void menu(Node* raiz) {
+    int op;
+    do {
+        cout << "\n===== MENU =====\n";
+        cout << "1. Exibir árvore\n"; 
+        cout << "0. Sair\n> ";
+        cin >> op;
+
+        if (op == 1) {
+            exibir_arvore(raiz);
+        } else if (op != 0) {
+            cout << "Opção inválida. Tente novamente.\n";
+        }
+    } while (op != 0);
+}
+
+// Função principal
+int main(int argc, char* argv[]) {
+    
+    string path = (argc > 1) ? argv[1] : fs::current_path().string();
+    cout << "Carregando estrutura de: " << path << "\n"; 
+    Node* raiz = carregar_estrutura(path);
+    if (!raiz) {
+        cerr << "Erro ao carregar estrutura.\n";
+        return 1;
+    }
+    menu(raiz); 
+    return 0;
+}
