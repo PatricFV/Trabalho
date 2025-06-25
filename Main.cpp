@@ -24,7 +24,7 @@ struct Node {
 };
 
 //Função para calcular o tamanho total de uma pasta de forma recursiva
-uintmax_t calcular_tamanho(Node* node) {
+uintmax_t calcular_tamanho(Node* node) {    //uintmax_t é um tipo de dado inteiro sem sinal
     if (!node->is_dir) return node->size;
     uintmax_t total = 0;
     for (auto child : node->children) {
@@ -36,7 +36,7 @@ uintmax_t calcular_tamanho(Node* node) {
 
 //Função para carregar a estrutura do diretório de forma recursiva
 Node* carregar_estrutura(const fs::path& path) {
-    if (!fs::exists(path)) return nullptr;
+    if (!fs::exists(path)) return nullptr;  //exists(path verificar se um arquivo ou diretório existe
 
     Node* node = new Node;
     node->name = path.filename().string();
