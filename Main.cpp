@@ -164,7 +164,7 @@ void menu(Node* raiz) {
             cout << "\n1. Maior arquivo\n";
             cout << "2. Arquivos > N bytes\n";
             cout << "3. Pasta com mais arquivos\n";
-            cout << "4. Arquivos por extensão\n";
+            cout << "4. Arquivos por extensao\n";
             cout << "5. Pastas vazias\n> ";
             int subop; cin >> subop;
             if (subop == 1) {
@@ -183,7 +183,7 @@ void menu(Node* raiz) {
                 if (resultado) cout << resultado->path << " (" << resultado->children.size() << " filhos)\n";
             } else if (subop == 4) {
                 string ext;
-                cout << "Digite a extensão (ex: .txt): "; cin >> ext;
+                cout << "Digite a extensao (ex: .txt): "; cin >> ext;
                 arquivos_por_extensao(raiz, ext);
             } else if (subop == 5) {
                 pastas_vazias(raiz);
